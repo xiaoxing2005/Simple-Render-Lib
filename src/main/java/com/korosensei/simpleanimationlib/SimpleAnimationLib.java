@@ -10,7 +10,7 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = SimpleAnimationLib.MODID, version = Tags.VERSION, name = "MyMod", acceptedMinecraftVersions = "[1.7.10]")
+@Mod(modid = SimpleAnimationLib.MODID, version = Tags.VERSION, name = "Simple Animation Lib", acceptedMinecraftVersions = "[1.7.10]")
 public class SimpleAnimationLib {
 
     public static final String MODID = "simpleanimationlib";
