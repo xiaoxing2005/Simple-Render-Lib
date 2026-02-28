@@ -1,5 +1,6 @@
-package com.korosensei.simpleanimationlib;
+package com.korosensei.simplerenderlib;
 
+import cpw.mods.fml.common.registry.GameRegistry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -10,13 +11,15 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = SimpleAnimationLib.MODID, version = Tags.VERSION, name = "Simple Animation Lib", acceptedMinecraftVersions = "[1.7.10]")
-public class SimpleAnimationLib {
+import static com.korosensei.simplerenderlib.CommonProxy.PowerChair;
 
-    public static final String MODID = "simpleanimationlib";
+@Mod(modid = SimpleRenderLib.MODID, version = Tags.VERSION, name = "Simple Render Lib", acceptedMinecraftVersions = "[1.7.10]")
+public class SimpleRenderLib {
+
+    public static final String MODID = "simplerenderlib";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
-    @SidedProxy(clientSide = "com.korosensei.simpleanimationlib.ClientProxy", serverSide = "com.korosensei.simpleanimationlib.CommonProxy")
+    @SidedProxy(clientSide = "com.korosensei.simplerenderlib.ClientProxy", serverSide = "com.korosensei.simplerenderlib.CommonProxy")
     public static CommonProxy proxy;
 
     @Mod.EventHandler
@@ -29,6 +32,9 @@ public class SimpleAnimationLib {
     @Mod.EventHandler
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {
+        GameRegistry
+            .registerBlock(PowerChair, BlockPowerChair.ItemBlockPowerChair.class, "BlockPowerChair");
+        GameRegistry.registerTileEntity(TilePowerChair.class, "TilePowerChair");
         proxy.init(event);
     }
 

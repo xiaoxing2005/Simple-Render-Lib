@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8.5-GTNH",
+  "package": "com.korosensei.simplerenderlib.mixin.early",
+  "refmap": "mixins.simpleanimationlib.refmap.json",
+  "target": "@env(DEFAULT)",
+  "compatibilityLevel": "JAVA_8",
+  "priority": 999
+}
