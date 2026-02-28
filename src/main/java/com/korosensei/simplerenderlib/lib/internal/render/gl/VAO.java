@@ -2,27 +2,19 @@ package com.korosensei.simplerenderlib.lib.internal.render.gl;
 
 import org.lwjgl.opengl.GL30;
 
-import java.util.Objects;
-
 public abstract class VAO implements AutoCloseable {
 
     public final int id;
-    private final BufferObject VBO;
     private boolean initialized;
     private boolean deleted;
 
-    public VAO(BufferObject VBO) {
-        this.VBO = Objects.requireNonNull(VBO, "VBO must not be null");
+    public VAO() {
         this.id = GL30.glGenVertexArrays();
     }
 
     public void Bind() {
         ensureAlive();
         GL30.glBindVertexArray(id);
-    }
-
-    public void bind() {
-        Bind();
     }
 
     public void Delete() {
@@ -33,29 +25,22 @@ public abstract class VAO implements AutoCloseable {
         deleted = true;
     }
 
-    public void delete() {
-        Delete();
-    }
-
     public void Unbind() {
         GL30.glBindVertexArray(0);
     }
 
-    public void unbind() {
-        Unbind();
-    }
+    public abstract void initVertexAttrib(BufferObject vbo);
 
-    public abstract void BindVertexAttrib(BufferObject VBO);
-
-    public VAO init() {
+    public void init(BufferObject vbo) {
         if (initialized) {
-            return this;
+            return;
         }
+        vbo.Bind();
         Bind();
-        BindVertexAttrib(VBO);
+        initVertexAttrib(vbo);
         Unbind();
+        vbo.unBind();
         initialized = true;
-        return this;
     }
 
     public boolean isInitialized() {

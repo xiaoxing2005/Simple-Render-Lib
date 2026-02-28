@@ -15,20 +15,13 @@ public class TilePowerChair extends TileEntity {
 
     @Override
     public AxisAlignedBB getRenderBoundingBox() {
-        return AxisAlignedBB.getBoundingBox(
-            xCoord,
-            yCoord,
-            zCoord,
-            xCoord + GRID_SIZE_X,
-            yCoord + GRID_SIZE_Y,
-            zCoord + GRID_SIZE_Z
-        );
+        return AxisAlignedBB
+            .getBoundingBox(xCoord, yCoord, zCoord, xCoord + GRID_SIZE_X, yCoord + GRID_SIZE_Y, zCoord + GRID_SIZE_Z);
     }
 
     @Override
     public double getMaxRenderDistanceSquared() {
         return 16777216.0;
     }
-
 
 }

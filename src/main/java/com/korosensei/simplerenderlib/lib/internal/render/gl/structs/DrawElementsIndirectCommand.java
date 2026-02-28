@@ -25,11 +25,15 @@ public class DrawElementsIndirectCommand {
     }
 
     public int[] toArray() {
-        return new int[]{count, instanceCount, firstIndex, baseVertex, baseInstance};
+        return new int[] { count, instanceCount, firstIndex, baseVertex, baseInstance };
     }
 
     public void writeTo(IntBuffer target) {
-        target.put(count).put(instanceCount).put(firstIndex).put(baseVertex).put(baseInstance);
+        target.put(count)
+            .put(instanceCount)
+            .put(firstIndex)
+            .put(baseVertex)
+            .put(baseInstance);
     }
 
     public static int[] flatten(DrawElementsIndirectCommand... commands) {

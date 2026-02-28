@@ -1,11 +1,12 @@
 package com.korosensei.simplerenderlib.lib.internal.render.gl;
 
-import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.DrawArraysIndirectCommand;
-import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.DrawElementsIndirectCommand;
+import java.nio.IntBuffer;
+
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL40;
 
-import java.nio.IntBuffer;
+import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.DrawArraysIndirectCommand;
+import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.DrawElementsIndirectCommand;
 
 public class IndirectBuffer extends GPUBuffer {
 

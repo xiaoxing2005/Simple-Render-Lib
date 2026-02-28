@@ -1,8 +1,9 @@
-﻿package com.korosensei.simplerenderlib.lib.internal.render.gl.structs;
+package com.korosensei.simplerenderlib.lib.internal.render.gl.structs;
 
 import java.util.Arrays;
 
 public final class FloatCollector {
+
     private float[] data;
     private int size;
 

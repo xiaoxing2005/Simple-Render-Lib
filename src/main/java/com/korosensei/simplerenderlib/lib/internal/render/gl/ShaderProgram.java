@@ -1,16 +1,17 @@
 package com.korosensei.simplerenderlib.lib.internal.render.gl;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.ResourceLocation;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL20;
+import static com.korosensei.simplerenderlib.SimpleRenderLib.LOG;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
-import static com.korosensei.simplerenderlib.SimpleRenderLib.LOG;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ResourceLocation;
+
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
 
 public class ShaderProgram implements AutoCloseable {
 
@@ -99,10 +100,12 @@ public class ShaderProgram implements AutoCloseable {
                 .getResourceManager()
                 .getResource(resourceLocation)
                 .getInputStream();
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    code.append(line).append('\n');
+                    code.append(line)
+                        .append('\n');
                 }
             }
             return code.toString();

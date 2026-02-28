@@ -1,11 +1,12 @@
 package com.korosensei.simplerenderlib.lib.internal.render.gl;
 
-import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.InstanceData;
+import java.nio.FloatBuffer;
+
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL31;
 import org.lwjgl.opengl.GL43;
 
-import java.nio.FloatBuffer;
+import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.InstanceData;
 
 public class BufferObject extends GPUBuffer {
 

@@ -1,8 +1,5 @@
 package com.korosensei.simplerenderlib;
 
-
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.renderer.texture.IIconRegister;
@@ -11,7 +8,11 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
+
 public class BlockPowerChair extends Block {
+
     public BlockPowerChair() {
         super(Material.iron);
         this.setResistance(20f);
@@ -50,7 +51,6 @@ public class BlockPowerChair extends Block {
     public boolean hasTileEntity(int metadata) {
         return true;
     }
-
 
     @Override
     public TileEntity createTileEntity(World world, int metadata) {

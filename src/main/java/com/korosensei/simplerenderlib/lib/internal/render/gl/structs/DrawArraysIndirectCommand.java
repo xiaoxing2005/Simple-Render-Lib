@@ -23,11 +23,14 @@ public class DrawArraysIndirectCommand {
     }
 
     public int[] toArray() {
-        return new int[]{count, instanceCount, first, baseInstance};
+        return new int[] { count, instanceCount, first, baseInstance };
     }
 
     public void writeTo(IntBuffer target) {
-        target.put(count).put(instanceCount).put(first).put(baseInstance);
+        target.put(count)
+            .put(instanceCount)
+            .put(first)
+            .put(baseInstance);
     }
 
     public static int[] flatten(DrawArraysIndirectCommand... commands) {

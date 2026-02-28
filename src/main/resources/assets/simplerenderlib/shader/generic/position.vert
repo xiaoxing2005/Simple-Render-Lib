@@ -1,10 +1,11 @@
 #version 430 core
 
-layout(location = 0) in vec3 inPos;
+layout(location = 0) in vec3 inPosition;
 
-uniform mat4 modelViewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 
 void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(inPos, 1.0);
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(inPosition, 1.0);
 }

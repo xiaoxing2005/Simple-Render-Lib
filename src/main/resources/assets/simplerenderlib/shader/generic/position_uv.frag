@@ -1,14 +1,11 @@
 #version 430 core
 
-in vec2 vUv;
-
-uniform vec4 uBrushColor;
-uniform sampler2D uTexture;
-uniform int uUseTexture;
-
+in vec2 fragUV;
 out vec4 fragColor;
 
+// 绑定基础纹理，通常在 0 号纹理单元
+layout(binding = 0) uniform sampler2D baseTexture;
+
 void main() {
-    vec4 baseColor = uUseTexture == 1 ? texture(uTexture, vUv) : vec4(1.0);
-    fragColor = baseColor * uBrushColor;
+    fragColor = texture(baseTexture, fragUV);
 }

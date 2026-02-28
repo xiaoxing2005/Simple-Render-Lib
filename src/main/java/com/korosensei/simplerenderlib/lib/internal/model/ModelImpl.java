@@ -1,8 +1,10 @@
 package com.korosensei.simplerenderlib.lib.internal.model;
 
-import com.korosensei.simplerenderlib.lib.api.IMesh;
 import net.minecraft.util.ResourceLocation;
+
 import org.joml.Matrix4f;
+
+import com.korosensei.simplerenderlib.lib.api.IMesh;
 
 public class ModelImpl implements IMesh {
 

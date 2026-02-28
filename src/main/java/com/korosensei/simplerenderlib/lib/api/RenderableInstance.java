@@ -3,7 +3,7 @@ package com.korosensei.simplerenderlib.lib.api;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-public class RenderableInstance implements IRenderable{
+public class RenderableInstance implements IRenderable {
 
     private final IMesh mesh;
     private Matrix4f worldMatrix;
@@ -20,7 +20,8 @@ public class RenderableInstance implements IRenderable{
 
     public RenderableInstance(IMesh mesh, Vector3f translate) {
         this.mesh = mesh;
-        this.worldMatrix = new Matrix4f().identity().translate(translate);
+        this.worldMatrix = new Matrix4f().identity()
+            .translate(translate);
     }
 
     @Override
