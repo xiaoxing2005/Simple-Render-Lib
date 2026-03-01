@@ -11,6 +11,7 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import cpw.mods.fml.common.eventhandler.EventBus;
 import cpw.mods.fml.common.registry.GameRegistry;
 
 @Mod(
@@ -22,6 +23,7 @@ public class SimpleRenderLib {
 
     public static final String MODID = "simplerenderlib";
     public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final EventBus EVENT_BUS = new EventBus();
 
     @SidedProxy(
         clientSide = "com.korosensei.simplerenderlib.ClientProxy",
@@ -38,8 +40,8 @@ public class SimpleRenderLib {
     @Mod.EventHandler
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {
-        GameRegistry.registerBlock(PowerChair, BlockPowerChair.ItemBlockPowerChair.class, "BlockPowerChair");
-        GameRegistry.registerTileEntity(TilePowerChair.class, "TilePowerChair");
+        GameRegistry.registerBlock(PowerChair, BlockPower.ItemBlockPowerChair.class, "BlockPower1");
+        GameRegistry.registerTileEntity(TilePower.class, "TilePower1");
         proxy.init(event);
     }
 

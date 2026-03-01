@@ -11,13 +11,13 @@ import net.minecraft.world.World;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
-public class BlockPowerChair extends Block {
+public class BlockPower extends Block {
 
-    public BlockPowerChair() {
+    public BlockPower() {
         super(Material.iron);
         this.setResistance(20f);
         this.setHardness(5.0f);
-        this.setBlockName("tst.PowerChair");
+        this.setBlockName("tst.Power");
         this.setBlockBounds(0.0F, 0.0F, 0.0F, 1.0F, 0.55F, 1.0F);
     }
 
@@ -29,7 +29,7 @@ public class BlockPowerChair extends Block {
 
     @Override
     public String getUnlocalizedName() {
-        return "BlockPowerChair";
+        return "BlockPower";
     }
 
     @Override
@@ -54,7 +54,7 @@ public class BlockPowerChair extends Block {
 
     @Override
     public TileEntity createTileEntity(World world, int metadata) {
-        return new TilePowerChair();
+        return new TilePower();
     }
 
     @Override

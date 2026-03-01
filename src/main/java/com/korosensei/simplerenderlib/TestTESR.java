@@ -1,18 +1,33 @@
 package com.korosensei.simplerenderlib;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import net.minecraft.tileentity.TileEntity;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
+import net.minecraft.util.ResourceLocation;
 
-import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.VertexStructure;
-import com.korosensei.simplerenderlib.lib.internal.render.renderer.GeneralRenderer;
+import org.lwjgl.opengl.GL11;
+
+import com.korosensei.simplerenderlib.lib.internal.model.Model;
+import com.korosensei.simplerenderlib.lib.internal.model.loader.ObjModelLoader;
+import com.korosensei.simplerenderlib.lib.internal.render.renderer.ModelRenderer;
+import com.korosensei.simplerenderlib.lib.manager.ModelManager;
+import com.korosensei.simplerenderlib.lib.manager.ShaderManager;
 
 public class TestTESR extends TileEntitySpecialRenderer {
 
-    private GeneralRenderer renderer;
     private boolean initialized = false;
-    private int lastLight = -1;
+
+    private static final ResourceLocation MODEL_LOCATION = new ResourceLocation(
+        "simplerenderlib",
+        "model/PowerChair.obj");
+    private static final ResourceLocation TEXTURE_LOCATION = new ResourceLocation(
+        "simplerenderlib",
+        "model/PowerChair.png");
+    private static final String MODEL_ID = MODEL_LOCATION.toString();
+
+    public TestTESR() {
+        // No need to listen to RenderWorldEvent.Pre for UBO updates
+    }
 
     @Override
     public void renderTileEntityAt(TileEntity tile, double x, double y, double z, float partialTicks) {
@@ -20,56 +35,59 @@ public class TestTESR extends TileEntitySpecialRenderer {
             initRenderData();
         }
 
-        // 获取当前方块位置的动态光照值（天空光 + 方块光）
-        int currentLight = tile.getWorldObj().getLightBrightnessForSkyBlocks(tile.xCoord, tile.yCoord, tile.zCoord, 0);
+        int currentLight = tile.getWorldObj()
+            .getLightBrightnessForSkyBlocks(tile.xCoord, tile.yCoord + 1, tile.zCoord, 0);
 
-        // 如果环境光照发生变化，则动态更新顶点数据中的亮度分量
-        if (currentLight != lastLight) {
-            updateTriangleLight(currentLight);
-            lastLight = currentLight;
-        }
+        GL11.glPushMatrix();
+        GL11.glDisable(GL11.GL_CULL_FACE);
 
-        // 所有的矩阵变换我们都通过 Renderer 的矩阵栈来处理
-        // 注意：在 render() 调用时，它会从 OpenGL 当前状态抓取 ViewMatrix
-        // 在 TESR 开始时，GL_MODELVIEW_MATRIX 已经包含了相机的位移旋转
-        
+        ModelRenderer renderer = ModelRenderer.getInstance();
+
+        // 1. 开启全局渲染环境（绑定 Shader 和 VBO）
+        renderer.begin();
+
+        // 2. 配置当前模型的变换矩阵
         renderer.pushMatrix();
-        // 将相对玩家相机的坐标 (x, y, z) 应用到模型矩阵中
-        renderer.translate((float) x, (float) y, (float) z);
+        renderer.translate((float) x + 0.5f, (float) y, (float) z + 0.5f);
+        renderer.scale(0.0625f, 0.0625f, 0.0625f);
 
-        // 执行渲染操作
-        // 内部会自动处理 Shader 绑定、矩阵上传以及渲染后的状态恢复
-        renderer.render();
+        // 3. 配置纹理和光照状态
+        Minecraft.getMinecraft()
+            .getTextureManager()
+            .bindTexture(TEXTURE_LOCATION);
+        renderer.setUniformBrightness(currentLight);
 
-        // 恢复渲染器内部的矩阵栈
+        // 4. 执行极速渲染，只传一个 ID 即可！
+        renderer.renderModel(MODEL_ID);
+
         renderer.popMatrix();
+
+        // 5. 结束并清理环境
+        renderer.end();
+
+        GL11.glEnable(GL11.GL_CULL_FACE);
+        GL11.glPopMatrix();
     }
 
     private void initRenderData() {
-        renderer = new GeneralRenderer();
-        // 初始化为 POSITION_COLOR_LIGHTMAP 结构
-        renderer.init(VertexStructure.POSITION_COLOR_LIGHTMAP, GL11.GL_TRIANGLES, GL15.GL_STATIC_DRAW);
+        try {
+            // 获取 ModelManager 并确保初始化了 VBO
+            ModelManager manager = ModelManager.getInstance();
+            manager.init();
+            ShaderManager.init();
+            // 解析模型
+            Model model = ObjModelLoader.loadModel(MODEL_LOCATION);
+
+            // 注册到巨型 VBO 缓冲区中
+            manager.registerModel(MODEL_ID, model);
+
+            // 一次性上传到显存（实际开发中，这个动作可以在游戏启动阶段统一调用一次）
+            manager.uploadToGPU();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         initialized = true;
-    }
-
-    /**
-     * 动态更新顶点缓存，将最新的光照值注入
-     */
-    private void updateTriangleLight(int light) {
-        float packedLight = Float.intBitsToFloat(light);
-
-        // 重新构建三角形的顶点数据（x, y, z, r, g, b, a, brightness）
-        float[][] triangleVertices = {
-            // 顶点 1：上方，红色
-            { 0.5f, 1.0f, 0.5f,  1.0f, 0.0f, 0.0f, 1.0f, packedLight },
-            // 顶点 2：左下，绿色
-            { 0.0f, 0.0f, 0.5f,  0.0f, 1.0f, 0.0f, 1.0f, packedLight },
-            // 顶点 3：右下，蓝色
-            { 1.0f, 0.0f, 0.5f,  0.0f, 0.0f, 1.0f, 1.0f, packedLight }
-        };
-
-        // 清空渲染器之前的顶点缓存并添加新顶点
-        renderer.clearVertices();
-        renderer.addVertices(triangleVertices);
     }
 }

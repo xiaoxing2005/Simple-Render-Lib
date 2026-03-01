@@ -4,7 +4,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.EnumFacing;
 
-public class TilePowerChair extends TileEntity {
+public class TilePower extends TileEntity {
 
     private static final int GRID_SIZE_X = 32;
     private static final int GRID_SIZE_Y = 32;

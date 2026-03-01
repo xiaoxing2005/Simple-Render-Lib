@@ -46,6 +46,20 @@ public class BufferObject extends GPUBuffer {
         }
     }
 
+    public void uploadBuffer(FloatBuffer data) {
+        if (data == null || data.capacity() == 0) {
+            allocate(0);
+            return;
+        }
+
+        data.rewind();
+        try {
+            upload(data);
+        } finally {
+            clearFloatStage();
+        }
+    }
+
     public void uploadData(InstanceData... instances) {
         int totalFloats = InstanceData.totalFloats(instances);
         if (totalFloats == 0) {
