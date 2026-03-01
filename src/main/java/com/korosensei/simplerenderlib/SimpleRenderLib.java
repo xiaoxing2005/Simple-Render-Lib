@@ -2,6 +2,7 @@ package com.korosensei.simplerenderlib;
 
 import static com.korosensei.simplerenderlib.CommonProxy.PowerChair;
 
+import cpw.mods.fml.common.eventhandler.EventBus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

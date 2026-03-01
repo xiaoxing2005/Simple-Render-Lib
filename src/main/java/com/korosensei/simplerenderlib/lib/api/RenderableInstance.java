@@ -2,6 +2,7 @@ package com.korosensei.simplerenderlib.lib.api;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import com.korosensei.simplerenderlib.lib.internal.model.IMesh;
 
 import com.korosensei.simplerenderlib.lib.internal.model.IMesh;
 

@@ -1,5 +1,6 @@
 package com.korosensei.simplerenderlib;
 
+import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import net.minecraft.block.Block;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
