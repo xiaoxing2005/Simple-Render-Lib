@@ -2,6 +2,7 @@ package com.korosensei.simplerenderlib;
 
 import static com.korosensei.simplerenderlib.CommonProxy.PowerChair;
 
+import cpw.mods.fml.common.eventhandler.EventBus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -22,6 +23,7 @@ public class SimpleRenderLib {
 
     public static final String MODID = "simplerenderlib";
     public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final EventBus EVENT_BUS = new EventBus();
 
     @SidedProxy(
         clientSide = "com.korosensei.simplerenderlib.ClientProxy",

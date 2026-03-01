@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.korosensei.simplerenderlib.lib.manager.ShaderManager;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.lwjgl.BufferUtils;
@@ -23,65 +24,57 @@ import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.VertexStruc
  */
 public class GeneralRenderer extends AbstractRenderer {
 
-    // 静态 Shader 常量（延迟初始化）
-    private static ShaderProgram shaderPosition;
-    private static ShaderProgram shaderPositionUV;
-    private static ShaderProgram shaderPositionColor;
-    private static ShaderProgram shaderPositionLightmap;
-    private static ShaderProgram shaderPositionUVLightmap;
-    private static ShaderProgram shaderPositionColorLightmap;
+    // 静态 Shader 常量（延迟初始化），只保留单一的超级着色器
+    private static ShaderProgram shaderUniversal;
 
     private boolean isInitialized = false;
     private VertexStructure structure;
     private int primitiveMode;
 
-    // 线程安全的顶点缓存集合
+    // 线程安全的顶点缓存集合 (缓存转换后的统一13-float顶点)
     private final List<float[]> vertexCache = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean isDirty = false;
     private int vertexCount = 0;
 
-    // 模型矩阵堆栈（使用 JOML 库，提供高效的矩阵运算和堆栈保存/恢复）
+    // 当前顶点状态 (Tessellator 模式)
+    private float currentR = -1.0f, currentG = -1.0f, currentB = -1.0f, currentA = -1.0f;
+    private float currentU = -1.0f, currentV = -1.0f;
+    private float currentNX = -1.0f, currentNY = -1.0f, currentNZ = -1.0f;
+    private int currentBrightness = -1;
+
+    // 全局光照 Uniform，默认 240 (满亮度)
+    private int uniformBrightness = 240;
+
+    // 模型矩阵堆栈
     private final Matrix4fStack matrixStack;
+
     // 预分配缓冲区，避免每帧分配产生的内存抖动和 GC 压力
     private final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
     private final FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
     private final FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
 
-    /**
-     * 无参构造函数
-     * 初始化在此被延迟，使用 {@link #init(VertexStructure, int,int)} 进行真正的初始化配置
-     */
     public GeneralRenderer() {
         super();
         this.matrixStack = new Matrix4fStack(16);
-        // 初始化为一个不做任何变换的单位矩阵
         this.matrixStack.identity();
     }
 
     @Override
     protected void initBuffers(int vboDrawType) {
         // 重写父类的 initBuffers 并保持为空。
-        // 目的是阻止在构造函数中过早地调用底层 OpenGL API 创建缓冲区。
     }
 
     @Override
     protected VAO createVAO() {
-        // 直接返回配置好的顶点结构中的 VAO
-        return structure != null ? structure.createVAO() : null;
+        // 始终使用 UNIVERSAL 结构与着色器对接
+        return VertexStructure.UNIVERSAL.createVAO();
     }
 
     @Override
     protected BufferObject createVBO(int vboDrawType) {
-        return null; // VBO is handled inside init
+        return null;
     }
 
-    /**
-     * 真正的初始化方法
-     * 只有在此方法执行后，渲染器才允许执行渲染
-     *
-     * @param structure     顶点结构定义 (如 VertexStructure.POSITION_UV 等)
-     * @param primitiveMode GL图元模式 (如 GL11.GL_TRIANGLES 等)
-     */
     public void init(VertexStructure structure, int primitiveMode, int DrawType) {
         if (isInitialized) {
             return;
@@ -89,9 +82,7 @@ public class GeneralRenderer extends AbstractRenderer {
         this.structure = structure;
         this.primitiveMode = primitiveMode;
 
-        // 初始化 VBO
         this.vbo = BufferObject.createVBO(DrawType);
-        // 初始化 VAO
         this.vao = createVAO();
         if (this.vao != null && this.vbo != null) {
             this.vao.init(this.vbo);
@@ -100,34 +91,23 @@ public class GeneralRenderer extends AbstractRenderer {
         this.isInitialized = true;
     }
 
-    /**
-     * 完全重置并重新初始化渲染器
-     * 会销毁现有的缓冲区对象，然后重新调用初始化逻辑
-     */
     public void reInitialize(VertexStructure structure, int primitiveMode, int DrawType) {
         reset();
-
         if (this.vbo != null && !this.vbo.isDeleted()) {
             this.vbo.close();
             this.vbo = null;
         }
-        // Notice: We don't close the VAO here because it might be a shared instance from VertexStructure.
-
         this.isInitialized = false;
         init(structure, primitiveMode, DrawType);
     }
 
-    /**
-     * 重置状态：清空所有顶点缓存、矩阵堆栈以及相关的计数器和脏标记。
-     */
     public void reset() {
         clearVertices();
         matrixStack.clear();
-        // 确保清空后栈顶仍为单位矩阵
         matrixStack.identity();
         this.vertexCount = 0;
         this.isDirty = false;
-        // Optionally empty the buffers on GPU if initialized
+        resetState();
         if (isInitialized) {
             if (this.vbo != null && !this.vbo.isDeleted()) {
                 this.vbo.uploadData(new float[0]);
@@ -136,8 +116,111 @@ public class GeneralRenderer extends AbstractRenderer {
     }
 
     // ==========================================
-    // 线程安全的顶点缓存与增删操作
+    // Tessellator 模式的方法
     // ==========================================
+
+    public void resetState() {
+        currentR = -1.0f; currentG = -1.0f; currentB = -1.0f; currentA = -1.0f;
+        currentU = -1.0f; currentV = -1.0f;
+        currentNX = -1.0f; currentNY = -1.0f; currentNZ = -1.0f;
+        currentBrightness = -1;
+    }
+
+    public void setColor(float r, float g, float b, float a) {
+        this.currentR = r;
+        this.currentG = g;
+        this.currentB = b;
+        this.currentA = a;
+    }
+
+    public void setUV(float u, float v) {
+        this.currentU = u;
+        this.currentV = v;
+    }
+
+    public void setNormal(float nx, float ny, float nz) {
+        this.currentNX = nx;
+        this.currentNY = ny;
+        this.currentNZ = nz;
+    }
+
+    public void setBrightness(int brightness) {
+        this.currentBrightness = brightness;
+    }
+
+    /**
+     * 设置全局统一的光照亮度（供着色器在顶点未指定亮度时作为后备使用）
+     * @param brightness 打包后的 Minecraft 光照值或 0-240 的简写满亮度值
+     */
+    public void setUniformBrightness(int brightness) {
+        this.uniformBrightness = brightness;
+    }
+
+    public void addVertex(float x, float y, float z) {
+        float[] padded = new float[13];
+        padded[0] = x;
+        padded[1] = y;
+        padded[2] = z;
+
+        padded[3] = currentR;
+        padded[4] = currentG;
+        padded[5] = currentB;
+        padded[6] = currentA;
+
+        padded[7] = currentU;
+        padded[8] = currentV;
+
+        padded[9] = currentNX;
+        padded[10] = currentNY;
+        padded[11] = currentNZ;
+
+        padded[12] = Float.intBitsToFloat(currentBrightness);
+
+        vertexCache.add(padded);
+        isDirty = true;
+    }
+
+    // --- 一次性提交便捷方法 ---
+
+    public void addVertexWithUV(float x, float y, float z, float u, float v) {
+        setUV(u, v);
+        addVertex(x, y, z);
+    }
+
+    public void addVertexWithColor(float x, float y, float z, float r, float g, float b, float a) {
+        setColor(r, g, b, a);
+        addVertex(x, y, z);
+    }
+
+    public void addVertexWithLightmap(float x, float y, float z, int brightness) {
+        setBrightness(brightness);
+        addVertex(x, y, z);
+    }
+
+    public void addVertexWithUVLightmap(float x, float y, float z, float u, float v, int brightness) {
+        setUV(u, v);
+        setBrightness(brightness);
+        addVertex(x, y, z);
+    }
+
+    public void addVertexWithColorLightmap(float x, float y, float z, float r, float g, float b, float a, int brightness) {
+        setColor(r, g, b, a);
+        setBrightness(brightness);
+        addVertex(x, y, z);
+    }
+
+    public void addVertexWithUVNormal(float x, float y, float z, float u, float v, float nx, float ny, float nz) {
+        setUV(u, v);
+        setNormal(nx, ny, nz);
+        addVertex(x, y, z);
+    }
+
+    public void addVertexWithUVNormalLightmap(float x, float y, float z, float u, float v, float nx, float ny, float nz, int brightness) {
+        setUV(u, v);
+        setNormal(nx, ny, nz);
+        setBrightness(brightness);
+        addVertex(x, y, z);
+    }
 
     private void validateVertexData(float[] vertexData) {
         if (structure == null) {
@@ -145,33 +228,74 @@ public class GeneralRenderer extends AbstractRenderer {
         }
         int expectedLength = structure.getVertexStride() / Float.BYTES;
         if (vertexData == null || vertexData.length != expectedLength) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "Invalid vertex data length. Expected %d floats, but got %d.",
-                    expectedLength,
-                    vertexData == null ? 0 : vertexData.length));
+            throw new IllegalArgumentException("Invalid vertex data length. Expected " + expectedLength + " but got " + (vertexData == null ? 0 : vertexData.length));
         }
+    }
+
+    /**
+     * 将任意合法长度的顶点数据转换为通用 (UNIVERSAL) 的 13 浮点数格式
+     * 缺少的属性使用 -1 填充以通知 Shader 禁用
+     */
+    private float[] padVertexData(float[] input) {
+        float[] padded = new float[13];
+        // 默认填充 -1.0f
+        padded[3] = -1.0f; padded[4] = -1.0f; padded[5] = -1.0f; padded[6] = -1.0f; // Color
+        padded[7] = -1.0f; padded[8] = -1.0f; // UV
+        padded[9] = -1.0f; padded[10] = -1.0f; padded[11] = -1.0f; // Normal
+        padded[12] = Float.intBitsToFloat(-1); // Brightness
+
+        // Position 必定存在 (0-2)
+        padded[0] = input[0];
+        padded[1] = input[1];
+        padded[2] = input[2];
+
+        if (structure == VertexStructure.POSITION) {
+            // Nothing to map
+        } else if (structure == VertexStructure.POSITION_UV) {
+            padded[7] = input[3]; padded[8] = input[4];
+        } else if (structure == VertexStructure.POSITION_COLOR) {
+            padded[3] = input[3]; padded[4] = input[4]; padded[5] = input[5]; padded[6] = input[6];
+        } else if (structure == VertexStructure.POSITION_LIGHTMAP) {
+            padded[12] = input[3];
+        } else if (structure == VertexStructure.POSITION_UV_LIGHTMAP) {
+            padded[7] = input[3]; padded[8] = input[4];
+            padded[12] = input[5];
+        } else if (structure == VertexStructure.POSITION_COLOR_LIGHTMAP) {
+            padded[3] = input[3]; padded[4] = input[4]; padded[5] = input[5]; padded[6] = input[6];
+            padded[12] = input[7];
+        } else if (structure == VertexStructure.POSITION_UV_NORMAL) {
+            padded[7] = input[3]; padded[8] = input[4];
+            padded[9] = input[5]; padded[10] = input[6]; padded[11] = input[7];
+        } else if (structure == VertexStructure.POSITION_UV_NORMAL_LIGHTMAP) {
+            padded[7] = input[3]; padded[8] = input[4];
+            padded[9] = input[5]; padded[10] = input[6]; padded[11] = input[7];
+            padded[12] = input[8];
+        }
+        return padded;
     }
 
     public void addVertex(float[] vertexData) {
         validateVertexData(vertexData);
-        vertexCache.add(vertexData);
+        vertexCache.add(padVertexData(vertexData));
         isDirty = true;
     }
 
     public void addVertices(float[][] vertices) {
         if (vertices == null) return;
+        List<float[]> paddedList = new ArrayList<>(vertices.length);
         for (float[] vertexData : vertices) {
             validateVertexData(vertexData);
+            paddedList.add(padVertexData(vertexData));
         }
         synchronized (vertexCache) {
-            Collections.addAll(vertexCache, vertices);
+            vertexCache.addAll(paddedList);
         }
         isDirty = true;
     }
 
     public void removeVertex(float[] vertexData) {
-        vertexCache.remove(vertexData);
+        // 由于存入的是 Padding 过的数组，直接 remove 对象会失效，
+        // 需要的时候应当 clear 重新填充。
         isDirty = true;
     }
 
@@ -180,86 +304,49 @@ public class GeneralRenderer extends AbstractRenderer {
         isDirty = true;
     }
 
-    // ==========================================
-    // 模型矩阵堆栈与变换操作
-    // ==========================================
-
-    /**
-     * 保存当前矩阵堆栈（压栈）
-     */
     public void pushMatrix() {
         matrixStack.pushMatrix();
     }
 
-    /**
-     * 恢复上一个矩阵堆栈（出栈）
-     */
     public void popMatrix() {
         matrixStack.popMatrix();
     }
 
-    /**
-     * 施加平移变换 (修改当前栈顶矩阵)
-     */
     public void translate(float x, float y, float z) {
         matrixStack.translate(x, y, z);
     }
 
-    /**
-     * 施加旋转变换 (修改当前栈顶矩阵)
-     * 
-     * @param angle 旋转角度 (弧度)
-     */
     public void rotate(float angle, float x, float y, float z) {
         matrixStack.rotate(angle, x, y, z);
     }
 
-    /**
-     * 施加缩放变换 (修改当前栈顶矩阵)
-     */
     public void scale(float x, float y, float z) {
         matrixStack.scale(x, y, z);
     }
 
-    /**
-     * 追加一个自定义的矩阵到堆栈 (修改当前栈顶矩阵)
-     */
     public void multMatrix(Matrix4f matrix) {
         matrixStack.mul(matrix);
     }
 
-    /**
-     * 清空当前所有矩阵变换
-     */
     public void clearMatrices() {
         matrixStack.clear();
         matrixStack.identity();
     }
 
-    /**
-     * 在渲染前，将当前栈顶的矩阵上传到 GPU 的 Shader 中进行运算
-     *
-     * @param uniformLocation Shader中模型矩阵的 Uniform 变量位置
-     */
     public void uploadMatrix(int uniformLocation) {
         if (uniformLocation >= 0) {
             matrixBuffer.clear();
-            matrixStack.get(matrixBuffer); // 写入 Buffer
+            matrixStack.get(matrixBuffer);
             GL20.glUniformMatrix4(uniformLocation, false, matrixBuffer);
         }
     }
 
-    // ==========================================
-    // 渲染相关逻辑
-    // ==========================================
-
     @Override
     public void render() {
         if (!isInitialized) {
-            throw new IllegalStateException("GeneralRenderer is not initialized yet. Call init() first.");
+            throw new IllegalStateException("GeneralRenderer is not initialized yet.");
         }
 
-        // 检查顶点集合是否有变更，如果有则重新填充 VBO
         if (isDirty) {
             updateVertices();
         }
@@ -268,38 +355,37 @@ public class GeneralRenderer extends AbstractRenderer {
         if (shader != null) {
             shader.use();
 
-            // 显式绑定采样器对应的纹理单元，防止采样器默认指向 0 导致冲突
+            // 采样器绑定
             int baseTexLoc = GL20.glGetUniformLocation(shader.getProgramID(), "baseTexture");
             if (baseTexLoc >= 0) GL20.glUniform1i(baseTexLoc, 0);
             int lightTexLoc = GL20.glGetUniformLocation(shader.getProgramID(), "lightmapTexture");
             if (lightTexLoc >= 0) GL20.glUniform1i(lightTexLoc, 1);
-            
-            // 获取并上传投影矩阵
+
+            // 投影矩阵
             projBuffer.clear();
             GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projBuffer);
             int projLoc = GL20.glGetUniformLocation(shader.getProgramID(), "projectionMatrix");
-            if (projLoc >= 0) {
-                GL20.glUniformMatrix4(projLoc, false, projBuffer);
-            }
-            
-            // 获取并上传视图矩阵
+            if (projLoc >= 0) GL20.glUniformMatrix4(projLoc, false, projBuffer);
+
+            // 视图矩阵
             viewBuffer.clear();
             GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, viewBuffer);
             int viewLoc = GL20.glGetUniformLocation(shader.getProgramID(), "viewMatrix");
-            if (viewLoc >= 0) {
-                GL20.glUniformMatrix4(viewLoc, false, viewBuffer);
-            }
+            if (viewLoc >= 0) GL20.glUniformMatrix4(viewLoc, false, viewBuffer);
 
-            // 上传渲染器内部维护的模型矩阵
+            // 模型矩阵
             int modelLoc = GL20.glGetUniformLocation(shader.getProgramID(), "modelMatrix");
             uploadMatrix(modelLoc);
+
+            // 全局亮度 Uniform
+            int brightLoc = GL20.glGetUniformLocation(shader.getProgramID(), "uBrightness");
+            if (brightLoc >= 0) GL20.glUniform1i(brightLoc, uniformBrightness);
         }
 
         super.render();
-        
+
         if (shader != null) {
             ShaderProgram.resetShader();
-            // 关键修复：确保将活动的纹理单元恢复为 0，防止干扰后续（如原版粒子）的渲染
             GL13.glActiveTexture(GL13.GL_TEXTURE0);
         }
     }
@@ -319,19 +405,11 @@ public class GeneralRenderer extends AbstractRenderer {
         vao.Unbind();
     }
 
-    /**
-     * 将缓存中的顶点数据同步并重新上传至 VBO，然后恢复标记
-     */
     private void updateVertices() {
         synchronized (vertexCache) {
-            if (!isDirty) {
-                return;
-            }
-
+            if (!isDirty) return;
             int totalFloats = 0;
-            for (float[] v : vertexCache) {
-                totalFloats += v.length;
-            }
+            for (float[] v : vertexCache) totalFloats += v.length;
 
             if (totalFloats == 0) {
                 this.vertexCount = 0;
@@ -343,12 +421,11 @@ public class GeneralRenderer extends AbstractRenderer {
                     offset += v.length;
                 }
 
-                int floatsPerVertex = structure.getVertexStride() / Float.BYTES;
+                // 由于已经转化为了 UNIVERSAL 结构，固定为 13
+                int floatsPerVertex = 13;
                 this.vertexCount = totalFloats / floatsPerVertex;
-
                 uploadVertexData(allData);
             }
-
             isDirty = false;
         }
     }
@@ -360,50 +437,12 @@ public class GeneralRenderer extends AbstractRenderer {
         }
     }
 
-    /**
-     * 获取当前渲染器 VertexStructure 对应的 ShaderProgram
-     * 如果对应的 Shader 尚未初始化，则会进行延迟初始化。
-     *
-     * @return 对应的 ShaderProgram，如果结构不匹配则返回 null
-     */
     public ShaderProgram getCurrentShader() {
-        if (structure == null) {
-            return null;
+        if (shaderUniversal == null || !shaderUniversal.isValid()) {
+            shaderUniversal = new ShaderProgram("simplerenderlib:shader/universal.vert", "simplerenderlib:shader/universal.frag");
+            ShaderManager.INSTANCE.registerShader(shaderUniversal);
         }
-        
-        if (structure == VertexStructure.POSITION) {
-            if (shaderPosition == null || !shaderPosition.isValid()) {
-                shaderPosition = new ShaderProgram("simplerenderlib:shader/generic/position.vert", "simplerenderlib:shader/generic/position.frag");
-            }
-            return shaderPosition;
-        } else if (structure == VertexStructure.POSITION_UV) {
-            if (shaderPositionUV == null || !shaderPositionUV.isValid()) {
-                shaderPositionUV = new ShaderProgram("simplerenderlib:shader/generic/position_uv.vert", "simplerenderlib:shader/generic/position_uv.frag");
-            }
-            return shaderPositionUV;
-        } else if (structure == VertexStructure.POSITION_COLOR) {
-            if (shaderPositionColor == null || !shaderPositionColor.isValid()) {
-                shaderPositionColor = new ShaderProgram("simplerenderlib:shader/generic/position_color.vert", "simplerenderlib:shader/generic/position_color.frag");
-            }
-            return shaderPositionColor;
-        } else if (structure == VertexStructure.POSITION_LIGHTMAP) {
-            if (shaderPositionLightmap == null || !shaderPositionLightmap.isValid()) {
-                shaderPositionLightmap = new ShaderProgram("simplerenderlib:shader/generic_lightmap/position_lightmap.vert", "simplerenderlib:shader/generic_lightmap/position_lightmap.frag");
-            }
-            return shaderPositionLightmap;
-        } else if (structure == VertexStructure.POSITION_UV_LIGHTMAP) {
-            if (shaderPositionUVLightmap == null || !shaderPositionUVLightmap.isValid()) {
-                shaderPositionUVLightmap = new ShaderProgram("simplerenderlib:shader/generic_lightmap/position_uv_lightmap.vert", "simplerenderlib:shader/generic_lightmap/position_uv_lightmap.frag");
-            }
-            return shaderPositionUVLightmap;
-        } else if (structure == VertexStructure.POSITION_COLOR_LIGHTMAP) {
-            if (shaderPositionColorLightmap == null || !shaderPositionColorLightmap.isValid()) {
-                shaderPositionColorLightmap = new ShaderProgram("simplerenderlib:shader/generic_lightmap/position_color_lightmap.vert", "simplerenderlib:shader/generic_lightmap/position_color_lightmap.frag");
-            }
-            return shaderPositionColorLightmap;
-        }
-        
-        return null;
+        return shaderUniversal;
     }
 
     @Override
