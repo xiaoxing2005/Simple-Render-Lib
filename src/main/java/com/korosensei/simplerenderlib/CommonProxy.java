@@ -1,13 +1,11 @@
 package com.korosensei.simplerenderlib;
 
-import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import net.minecraft.block.Block;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
-import cpw.mods.fml.common.registry.GameRegistry;
 
 public abstract class CommonProxy {
 
