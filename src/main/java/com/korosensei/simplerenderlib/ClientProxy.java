@@ -2,6 +2,7 @@ package com.korosensei.simplerenderlib;
 
 import static com.korosensei.simplerenderlib.SimpleRenderLib.EVENT_BUS;
 
+import com.korosensei.simplerenderlib.lib.manager.RenderManager;
 import net.minecraft.util.ResourceLocation;
 
 import com.korosensei.simplerenderlib.clinet.Event.ModelLoaderEvent;
@@ -24,8 +25,7 @@ public class ClientProxy extends CommonProxy {
     // Don't forget to call the super methods as well.
     @Override
     public void init(FMLInitializationEvent event) {
-        // RenderManager.init();
-
+        super.init(event);
         ShaderRegisterEvent shaderRegisterEvent = new ShaderRegisterEvent(ShaderManager.INSTANCE);
         EVENT_BUS.post(shaderRegisterEvent);
         ModelLoaderEvent modelLoaderEvent = new ModelLoaderEvent(ModelManager.getInstance());

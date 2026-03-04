@@ -1,5 +1,6 @@
 package com.korosensei.simplerenderlib.lib.internal.render.renderer;
 
+import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.VertexStructure;
 import org.lwjgl.opengl.GL15;
 
 import com.korosensei.simplerenderlib.lib.internal.render.gl.BufferObject;
@@ -37,16 +38,20 @@ public abstract class AbstractRenderer implements AutoCloseable {
     /**
      * 抽象方法：由子类提供一个具体的 VAO 实例。
      * 子类需要在该 VAO 的 initVertexAttrib() 中配置顶点属性指针。
-     * 
+     *
      * @return 初始化的 VAO 实例
      */
-    protected abstract VAO createVAO();
+    protected VAO createVAO() {
+        return VertexStructure.UNIVERSAL.createVAO();
+    }
 
-    protected abstract BufferObject createVBO(int vboDrawType);
+    protected BufferObject createVBO(int vboDrawType) {
+        return BufferObject.createVBO(vboDrawType);
+    }
 
     /**
      * 预留的方法：为顶点缓冲区 (VBO) 填充数据
-     * 
+     *
      * @param vertexData 顶点数据
      */
     public void uploadVertexData(float[] vertexData) {

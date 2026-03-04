@@ -14,6 +14,7 @@ import com.korosensei.simplerenderlib.lib.internal.model.IMesh;
 import com.korosensei.simplerenderlib.lib.internal.render.gl.BufferObject;
 import com.korosensei.simplerenderlib.lib.internal.render.gl.VAO;
 import com.korosensei.simplerenderlib.lib.internal.render.gl.structs.VertexStructure;
+import org.lwjgl.opengl.GL30;
 
 /**
  * 唯一的巨型 VBO 模型管理器
@@ -80,7 +81,6 @@ public class ModelManager {
             VAO = VertexStructure.UNIVERSAL.createVAO();
 
             VAO.init(VBO);
-
             // 将 EBO 绑定记录到 VAO 中
             VAO.Bind();
             EBO.Bind();
@@ -117,8 +117,7 @@ public class ModelManager {
         ModelAllocation alloc = new ModelAllocation(startOffset, vertexCount);
 
         // 如果模型支持索引，处理并记录所有分组的索引
-        if (mesh instanceof IIndexedMesh) {
-            IIndexedMesh indexedMesh = (IIndexedMesh) mesh;
+        if (mesh instanceof IIndexedMesh indexedMesh) {
 
             for (String group : indexedMesh.getGroupNames()) {
                 int[] groupIndices = indexedMesh.getIndices(group);

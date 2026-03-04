@@ -36,7 +36,7 @@ public class GeneralRenderer extends AbstractRenderer {
     private volatile boolean isDirty = false;
     private int vertexCount = 0;
 
-    // 当前顶点状态 (Tessellator 模式)
+    // 当前顶点状态
     private float currentR = -1.0f, currentG = -1.0f, currentB = -1.0f, currentA = -1.0f;
     private float currentU = -1.0f, currentV = -1.0f;
     private float currentNX = -1.0f, currentNY = -1.0f, currentNZ = -1.0f;
@@ -115,10 +115,6 @@ public class GeneralRenderer extends AbstractRenderer {
         }
     }
 
-    // ==========================================
-    // Tessellator 模式的方法
-    // ==========================================
-
     public void resetState() {
         currentR = -1.0f;
         currentG = -1.0f;
@@ -156,7 +152,7 @@ public class GeneralRenderer extends AbstractRenderer {
 
     /**
      * 设置全局统一的光照亮度（供着色器在顶点未指定亮度时作为后备使用）
-     * 
+     *
      * @param brightness 打包后的 Minecraft 光照值或 0-240 的简写满亮度值
      */
     public void setUniformBrightness(int brightness) {
@@ -251,58 +247,70 @@ public class GeneralRenderer extends AbstractRenderer {
     private float[] padVertexData(float[] input) {
         float[] padded = new float[13];
         // 默认填充 -1.0f
-        padded[3] = -1.0f;
-        padded[4] = -1.0f;
-        padded[5] = -1.0f;
-        padded[6] = -1.0f; // Color
-        padded[7] = -1.0f;
-        padded[8] = -1.0f; // UV
-        padded[9] = -1.0f;
-        padded[10] = -1.0f;
-        padded[11] = -1.0f; // Normal
-        padded[12] = Float.intBitsToFloat(-1); // Brightness
+        padded[3] = currentR;
+        padded[4] = currentG;
+        padded[5] = currentB;
+        padded[6] = currentA;
+
+        padded[7] = currentU;
+        padded[8] = currentV;
+
+        padded[9] = currentNX;
+        padded[10] = currentNY;
+        padded[11] = currentNZ;
+        padded[12] = currentBrightness;// Brightness
 
         // Position 必定存在 (0-2)
         padded[0] = input[0];
         padded[1] = input[1];
         padded[2] = input[2];
 
-        if (structure == VertexStructure.POSITION) {
-            // Nothing to map
-        } else if (structure == VertexStructure.POSITION_UV) {
-            padded[7] = input[3];
-            padded[8] = input[4];
-        } else if (structure == VertexStructure.POSITION_COLOR) {
-            padded[3] = input[3];
-            padded[4] = input[4];
-            padded[5] = input[5];
-            padded[6] = input[6];
-        } else if (structure == VertexStructure.POSITION_LIGHTMAP) {
-            padded[12] = input[3];
-        } else if (structure == VertexStructure.POSITION_UV_LIGHTMAP) {
-            padded[7] = input[3];
-            padded[8] = input[4];
-            padded[12] = input[5];
-        } else if (structure == VertexStructure.POSITION_COLOR_LIGHTMAP) {
-            padded[3] = input[3];
-            padded[4] = input[4];
-            padded[5] = input[5];
-            padded[6] = input[6];
-            padded[12] = input[7];
-        } else if (structure == VertexStructure.POSITION_UV_NORMAL) {
-            padded[7] = input[3];
-            padded[8] = input[4];
-            padded[9] = input[5];
-            padded[10] = input[6];
-            padded[11] = input[7];
-        } else if (structure == VertexStructure.POSITION_UV_NORMAL_LIGHTMAP) {
-            padded[7] = input[3];
-            padded[8] = input[4];
-            padded[9] = input[5];
-            padded[10] = input[6];
-            padded[11] = input[7];
-            padded[12] = input[8];
+        switch (structure) {
+            case POSITION -> {
+                // Nothing to map
+            }
+            case POSITION_UV -> {
+                padded[7] = input[3];
+                padded[8] = input[4];
+            }
+            case POSITION_COLOR -> {
+                padded[3] = input[3];
+                padded[4] = input[4];
+                padded[5] = input[5];
+                padded[6] = input[6];
+            }
+            case POSITION_LIGHTMAP -> {
+                padded[12] = input[3];
+            }
+            case POSITION_UV_LIGHTMAP -> {
+                padded[7] = input[3];
+                padded[8] = input[4];
+                padded[12] = input[5];
+            }
+            case POSITION_COLOR_LIGHTMAP -> {
+                padded[3] = input[3];
+                padded[4] = input[4];
+                padded[5] = input[5];
+                padded[6] = input[6];
+                padded[12] = input[7];
+            }
+            case POSITION_UV_NORMAL -> {
+                padded[7] = input[3];
+                padded[8] = input[4];
+                padded[9] = input[5];
+                padded[10] = input[6];
+                padded[11] = input[7];
+            }
+            case POSITION_UV_NORMAL_LIGHTMAP -> {
+                padded[7] = input[3];
+                padded[8] = input[4];
+                padded[9] = input[5];
+                padded[10] = input[6];
+                padded[11] = input[7];
+                padded[12] = input[8];
+            }
         }
+
         return padded;
     }
 

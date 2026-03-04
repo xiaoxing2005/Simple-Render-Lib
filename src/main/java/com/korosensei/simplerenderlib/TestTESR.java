@@ -1,5 +1,7 @@
 package com.korosensei.simplerenderlib;
 
+import com.korosensei.simplerenderlib.lib.internal.render.gl.ShaderProgram;
+import com.korosensei.simplerenderlib.lib.manager.RenderManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import net.minecraft.tileentity.TileEntity;
@@ -12,6 +14,7 @@ import com.korosensei.simplerenderlib.lib.internal.model.loader.ObjModelLoader;
 import com.korosensei.simplerenderlib.lib.internal.render.renderer.ModelRenderer;
 import com.korosensei.simplerenderlib.lib.manager.ModelManager;
 import com.korosensei.simplerenderlib.lib.manager.ShaderManager;
+import org.lwjgl.opengl.GL32;
 
 public class TestTESR extends TileEntitySpecialRenderer {
 
@@ -19,10 +22,13 @@ public class TestTESR extends TileEntitySpecialRenderer {
 
     private static final ResourceLocation MODEL_LOCATION = new ResourceLocation(
         "simplerenderlib",
-        "model/PowerChair.obj");
+        "model/test.obj");
     private static final ResourceLocation TEXTURE_LOCATION = new ResourceLocation(
         "simplerenderlib",
-        "model/PowerChair.png");
+        "model/test.png");
+    private final ShaderProgram shader = new ShaderProgram(
+        "simplerenderlib:shader/SpecialShader.vert",
+        "simplerenderlib:shader/SpecialShader.frag");
     private static final String MODEL_ID = MODEL_LOCATION.toString();
 
     public TestTESR() {
@@ -42,15 +48,16 @@ public class TestTESR extends TileEntitySpecialRenderer {
         GL11.glDisable(GL11.GL_CULL_FACE);
 
         ModelRenderer renderer = ModelRenderer.getInstance();
-
+        RenderManager.INSTANCE.updateDepth();
+        renderer.setSpecialShader(shader);
+        //RenderManager.INSTANCE.updateMVPMatrices();
         // 1. 开启全局渲染环境（绑定 Shader 和 VBO）
         renderer.begin();
 
         // 2. 配置当前模型的变换矩阵
         renderer.pushMatrix();
         renderer.translate((float) x + 0.5f, (float) y, (float) z + 0.5f);
-        renderer.scale(0.0625f, 0.0625f, 0.0625f);
-
+//        renderer.scale(0.0625f, 0.0625f, 0.0625f);
         // 3. 配置纹理和光照状态
         Minecraft.getMinecraft()
             .getTextureManager()
@@ -72,9 +79,8 @@ public class TestTESR extends TileEntitySpecialRenderer {
     private void initRenderData() {
         try {
             // 获取 ModelManager 并确保初始化了 VBO
+            RenderManager.initialize();
             ModelManager manager = ModelManager.getInstance();
-            manager.init();
-            ShaderManager.init();
             // 解析模型
             Model model = ObjModelLoader.loadModel(MODEL_LOCATION);
 

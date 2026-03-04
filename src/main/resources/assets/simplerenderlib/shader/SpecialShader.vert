@@ -9,19 +9,27 @@ layout(location = 4) in int inBrightness;
 out vec4 fragVertexColor;
 out vec2 fragUV;
 out vec2 fragLightmapUV;
+out mat4 inversePV;
+out vec3 vWorldPosition;
+out vec2 u_Size;
+out float u_Far;
 flat out float vLightIntensity;
 
 layout (std140, binding = 0) uniform Matrices
 {
     mat4 projectionMatrix;
     mat4 viewMatrix;
-    vec2 size;
+    vec3 size;
 };
 uniform mat4 modelMatrix;
 uniform int uBrightness; // Global brightness fallback
 
 void main() {
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(inPosition, 1.0);
+    inversePV = inverse(projectionMatrix * viewMatrix);
+    vWorldPosition = (modelMatrix * vec4(inPosition, 1.0)).xyz;
+    u_Size = size.xy;
+    u_Far = size.z;
 
     fragVertexColor = inColor;
     fragUV = inUV;

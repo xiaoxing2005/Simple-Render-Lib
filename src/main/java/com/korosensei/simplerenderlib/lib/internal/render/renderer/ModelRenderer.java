@@ -2,6 +2,7 @@ package com.korosensei.simplerenderlib.lib.internal.render.renderer;
 
 import java.nio.FloatBuffer;
 
+import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.lwjgl.BufferUtils;
@@ -15,30 +16,32 @@ import com.korosensei.simplerenderlib.lib.manager.ShaderManager;
 
 /**
  * 专为 ModelManager 巨型 VBO 架构设计的高性能静态渲染器。
- * 不再持有任何自身的顶点缓存和 VAO，纯粹负责：
- * 1. 矩阵计算与上传
- * 2. 状态切换与 Shader 挂载
- * 3. 触发巨型 VBO 上的局部绘制指令 (Draw Call)
+ * 继承自 AbstractRenderer，复用了渲染的生命周期流程。
  */
-public class ModelRenderer {
+public class ModelRenderer extends AbstractRenderer {
 
     private static final ModelRenderer INSTANCE = new ModelRenderer();
 
     // 唯一的超级着色器
     private ShaderProgram shaderUniversal;
+    private ShaderProgram SpecialShader;
 
     // 模型矩阵堆栈
     private final Matrix4fStack matrixStack;
 
     // 预分配的缓冲区，避免 GC 压力
     private final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
-    private final FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
-    private final FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
 
     // 全局光照 Uniform，默认满亮度
     private int uniformBrightness = 240;
 
+    // 当前要渲染的模型ID和组名
+    private String currentModelIdentifier;
+    private String currentGroupName;
+
     private ModelRenderer() {
+        // 由于使用了全局 VBO/VAO，我们向父类传递 0 或者不初始化自身的缓冲区
+        super(0);
         this.matrixStack = new Matrix4fStack(16);
         this.matrixStack.identity();
     }
@@ -47,15 +50,96 @@ public class ModelRenderer {
         return INSTANCE;
     }
 
+    @Override
+    protected void initBuffers(int vboDrawType) {
+        // 覆盖父类的初始化，因为 ModelRenderer 依赖 ModelManager 的巨型 VBO
+        // 不需要创建自己的 VBO 和 VAO
+    }
+
+    @Override
+    protected boolean bufferCheck() {
+        return ModelManager.getInstance().getAllocation(currentModelIdentifier) != null;
+    }
+
+    @Override
+    protected void bufferBind() {
+        ShaderProgram shader = getShader();
+        if (shader == null) return;
+
+        shader.use();
+
+        // 投影和视图矩阵已由 RenderManager 的 UBO (binding = 0) 提供
+        // ShaderManager.INSTANCE.updateUBO(); 已经废弃
+
+        // 配置纹理单元
+        int baseTexLoc = GL20.glGetUniformLocation(shader.getProgramID(), "baseTexture");
+        if (baseTexLoc >= 0) GL20.glUniform1i(baseTexLoc, 0);
+        int lightTexLoc = GL20.glGetUniformLocation(shader.getProgramID(), "lightmapTexture");
+        if (lightTexLoc >= 0) GL20.glUniform1i(lightTexLoc, 1);
+
+        // 绑定 ModelManager 提供的巨型 VAO 和 EBO
+        ModelManager.getInstance().bind();
+    }
+
+    @Override
+    protected void bufferUnbind() {
+        ModelManager.getInstance().unbind();
+        ShaderProgram.resetShader();
+        GL13.glActiveTexture(GL13.GL_TEXTURE0);
+
+        // 清理当前绘制目标
+        currentModelIdentifier = null;
+        currentGroupName = null;
+    }
+
+    @Override
+    protected void draw() {
+        ModelManager.ModelAllocation alloc = ModelManager.getInstance().getAllocation(currentModelIdentifier);
+        if (alloc == null) {
+            return;
+        }
+
+        ShaderProgram shader = getShader();
+        if (shader == null) return;
+
+        // 1. 上传当前栈顶的模型矩阵
+        int modelLoc = GL20.glGetUniformLocation(shader.getProgramID(), "modelMatrix");
+        if (modelLoc >= 0) {
+            matrixBuffer.clear();
+            matrixStack.get(matrixBuffer);
+            GL20.glUniformMatrix4(modelLoc, false, matrixBuffer);
+        }
+
+        // 2. 上传全局亮度
+        int brightLoc = GL20.glGetUniformLocation(shader.getProgramID(), "uBrightness");
+        if (brightLoc >= 0) {
+            GL20.glUniform1i(brightLoc, uniformBrightness);
+        }
+
+        // 3. 执行极速局部绘制
+        if (currentGroupName != null && alloc.groups.containsKey(currentGroupName)) {
+            ModelManager.ModelGroupAllocation groupAlloc = alloc.groups.get(currentGroupName);
+            GL11.glDrawElements(
+                GL11.GL_TRIANGLES,
+                groupAlloc.indexCount,
+                GL11.GL_UNSIGNED_INT,
+                groupAlloc.firstIndex * 4L);
+        } else {
+            GL11.glDrawArrays(GL11.GL_TRIANGLES, alloc.first, alloc.count);
+        }
+    }
+
     /**
      * 获取通用的超级着色器，支持延迟初始化
      */
     public ShaderProgram getShader() {
+        if (SpecialShader != null && SpecialShader.isValid()) {
+            return SpecialShader;
+        }
         if (shaderUniversal == null || !shaderUniversal.isValid()) {
             shaderUniversal = new ShaderProgram(
                 "simplerenderlib:shader/universal.vert",
                 "simplerenderlib:shader/universal.frag");
-            // ShaderManager.INSTANCE.registerShader(shaderUniversal);
         }
         return shaderUniversal;
     }
@@ -93,6 +177,10 @@ public class ModelRenderer {
         matrixStack.identity();
     }
 
+    public void setSpecialShader(ShaderProgram shader) {
+        this.SpecialShader = shader;
+    }
+
     // ==========================================
     // 状态配置
     // ==========================================
@@ -105,27 +193,10 @@ public class ModelRenderer {
     }
 
     /**
-     * 准备渲染环境：绑定超级 Shader、同步 OpenGL 的投影和视图矩阵，并绑定巨型 VAO。
-     * 在开始连续渲染多个模型前，只需调用一次此方法。
+     * 兼容旧版 begin()
      */
     public void begin() {
-        ShaderProgram shader = getShader();
-        if (shader == null) return;
-
-        shader.use();
-
-        // 每次渲染实体前，更新一次 UBO 以确保获取到正确的投影和视图矩阵
-        ShaderManager.INSTANCE.updateUBO();
-
-        // 配置纹理单元
-        int baseTexLoc = GL20.glGetUniformLocation(shader.getProgramID(), "baseTexture");
-        if (baseTexLoc >= 0) GL20.glUniform1i(baseTexLoc, 0);
-        int lightTexLoc = GL20.glGetUniformLocation(shader.getProgramID(), "lightmapTexture");
-        if (lightTexLoc >= 0) GL20.glUniform1i(lightTexLoc, 1);
-
-        // 绑定 ModelManager 提供的巨型 VAO 和 EBO
-        ModelManager.getInstance()
-            .bind();
+        // 交由 AbstractRenderer 的 render() 内的 bufferBind() 自动处理
     }
 
     /**
@@ -136,42 +207,10 @@ public class ModelRenderer {
      * @param groupName       要渲染的分组名称（传入 null 以渲染全部）
      */
     public void renderModel(String modelIdentifier, String groupName) {
-        ModelManager.ModelAllocation alloc = ModelManager.getInstance()
-            .getAllocation(modelIdentifier);
-        if (alloc == null) {
-            return;
-        }
-
-        ShaderProgram shader = getShader();
-        if (shader == null) return;
-
-        // 1. 上传当前栈顶的模型矩阵
-        int modelLoc = GL20.glGetUniformLocation(shader.getProgramID(), "modelMatrix");
-        if (modelLoc >= 0) {
-            matrixBuffer.clear();
-            matrixStack.get(matrixBuffer);
-            GL20.glUniformMatrix4(modelLoc, false, matrixBuffer);
-        }
-
-        // 2. 上传全局亮度
-        int brightLoc = GL20.glGetUniformLocation(shader.getProgramID(), "uBrightness");
-        if (brightLoc >= 0) {
-            GL20.glUniform1i(brightLoc, uniformBrightness);
-        }
-
-        // 3. 执行极速局部绘制
-        if (groupName != null && alloc.groups.containsKey(groupName)) {
-            ModelManager.ModelGroupAllocation groupAlloc = alloc.groups.get(groupName);
-            // 使用 glDrawElements 渲染 EBO 中指定的索引片段，索引为 int (GL_UNSIGNED_INT)，每个占 4 字节
-            GL11.glDrawElements(
-                GL11.GL_TRIANGLES,
-                groupAlloc.indexCount,
-                GL11.GL_UNSIGNED_INT,
-                groupAlloc.firstIndex * 4L);
-        } else {
-            // 如果没有指定分组，或者模型本身没有索引数据，则回退到绘制整个 VBO 片段
-            GL11.glDrawArrays(GL11.GL_TRIANGLES, alloc.first, alloc.count);
-        }
+        this.currentModelIdentifier = modelIdentifier;
+        this.currentGroupName = groupName;
+        // 触发 AbstractRenderer 的生命周期循环 (bufferCheck -> bufferBind -> draw -> bufferUnbind)
+        super.render();
     }
 
     /**
@@ -182,12 +221,9 @@ public class ModelRenderer {
     }
 
     /**
-     * 结束渲染环境：解绑 VAO 并重置 Shader 状态。
+     * 兼容旧版 end()
      */
     public void end() {
-        ModelManager.getInstance()
-            .unbind();
-        ShaderProgram.resetShader();
-        GL13.glActiveTexture(GL13.GL_TEXTURE0);
+        // 交由 AbstractRenderer 的 render() 内的 bufferUnbind() 自动处理
     }
 }

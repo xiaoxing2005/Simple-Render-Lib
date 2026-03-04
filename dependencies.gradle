@@ -36,6 +36,6 @@
 
 dependencies {
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.8-GTNH:dev")
-    runtimeOnly("com.github.GTNewHorizons:Angelica:2.0.0-alpha25:dev")
+//    runtimeOnly("com.github.GTNewHorizons:Angelica:2.0.0-alpha25:dev")
     shadowImplementation "org.joml:joml:1.10.8"
 }
